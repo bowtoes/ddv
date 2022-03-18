@@ -1,0 +1,6 @@
+*.dds
+*build
+ddv
+gmon.out
+compile_commands.json
+*.cache

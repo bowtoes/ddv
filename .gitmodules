@@ -1,0 +1,6 @@
+[submodule "vnd/brrtools"]
+	path = vnd/brrtools
+	url = https://www.github.com/bowtoes/brrtools.git
+[submodule "vnd/raylib"]
+	path = vnd/raylib
+	url = https://www.github.com/raysan5/raylib.git
