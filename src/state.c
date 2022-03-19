@@ -258,8 +258,8 @@ state_init(state_t *const state, int argc, const char **const argv)
 		return 0;
 
 	state_t s = {};
-	s.mode = operation_mode_look;
-	s.adjacent_files = 1;
+	s.mode = operation_mode_check;
+	//s.adjacent_files = 1;
 
 	/* Grab arguments that aren't flags */
 	const char **unhandled = NULL;
@@ -398,16 +398,23 @@ i_select_texture_index(state_t *const state, int offset, i_texidx_t options)
 	/* I hate vector math */
 	int tx = state->texture.width * state->scale_x;
 	int ty = state->texture.height * state->scale_y;
-	int should_reset_size = options.reset_window_size || tx > state->screen_width || ty > state->screen_height;
-	if (options.reset_window_size) {
-		state->screen_width = fminf(tx, state->monitor_x);
-		state->screen_height = fminf(ty, state->monitor_y);
+	int tex_increase_x = tx > state->screen_width;
+	int tex_increase_y = ty > state->screen_height;
+	int need_resize = next != state->selected_input && (tex_increase_x || tex_increase_y);
+	if (options.reset_window_size || need_resize) {
+		if (tex_increase_x || options.reset_window_size)
+			state->screen_width = fminf(tx, state->monitor_x);
+		if (tex_increase_y || options.reset_window_size)
+			state->screen_height = fminf(ty, state->monitor_y);
 		SetWindowSize(state->screen_width, state->screen_height);
 	}
 	if (options.reset_window_pos) {
 		int x = .5 * (state->monitor_x - state->screen_width);
 		int y = .5 * (state->monitor_y - state->screen_height);
 		SetWindowPosition(x, y);
+	}
+	if (options.reset_offset || need_resize) {
+		state->ofs_x = state->ofs_y = 0;
 	}
 
 	float S = 100 * fmaxf(state->scale_x, state->scale_y);
@@ -439,69 +446,87 @@ i_state_update(state_t *const state)
 		s.mouse_x = v.x; s.mouse_y = v.y;
 	}
 
+	typedef enum mod {
+		mod_none = 0,
+		mod_shift = 1,
+		mod_ctrl = 2,
+		mod_alt = 4,
+	} mod_t;
+	int key = 0;
+	mod_t mod = mod_none;
+	while (true) {
+		int i = GetKeyPressed();
+		if (!i)
+			break;
+		key = i;
+	}
+	if (IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT))
+		mod |= mod_shift;
+	if (IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL))
+		mod |= mod_ctrl;
+	if (IsKeyDown(KEY_LEFT_ALT) || IsKeyDown(KEY_RIGHT_ALT))
+		mod |= mod_alt;
+
+	int mouse_pressed = -1;
+	int mouse_down = -1;
+	if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
+		mouse_pressed = MOUSE_BUTTON_LEFT;
+	else if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT))
+		mouse_pressed = MOUSE_BUTTON_RIGHT;
+	else if (IsMouseButtonPressed(MOUSE_BUTTON_MIDDLE))
+		mouse_pressed = MOUSE_BUTTON_MIDDLE;
+	if (IsMouseButtonDown(MOUSE_BUTTON_LEFT))
+		mouse_down = MOUSE_BUTTON_LEFT;
+	else if (IsMouseButtonDown(MOUSE_BUTTON_RIGHT))
+		mouse_down = MOUSE_BUTTON_RIGHT;
+	else if (IsMouseButtonDown(MOUSE_BUTTON_MIDDLE))
+		mouse_down = MOUSE_BUTTON_MIDDLE;
+
+	float scroll = GetMouseWheelMove();
+
 	/* Update */
-	if (IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
+	if (mouse_down == MOUSE_BUTTON_LEFT) {
 		Vector2 o = GetMouseDelta();
 		s.ofs_x += o.x;
 		s.ofs_y += o.y;
-	} else if (IsMouseButtonPressed(MOUSE_RIGHT_BUTTON)) {
-		if (i_select_texture_index(&s, 1, no_reset))
-			return 1;
+	} else if (mouse_pressed == MOUSE_BUTTON_RIGHT) {
+		i_select_texture_index(&s, 1, no_reset);
 	}
 
-	if (IsKeyPressed(KEY_T)) {
-		s.background = (s.background + 1) % _background_type_count;
-	} else if (IsKeyPressed(KEY_F)) {
-		s.filter_on = !s.filter_on;
-		if (i_select_texture_index(&s, 0, no_reset))
-			return 1;
-	} else if (IsKeyPressed(KEY_SPACE)) {
-		if (i_select_texture_index(&s, 0, full_reset))
-			return 1;
-	} else if (IsKeyPressed(KEY_N) || IsKeyPressed(KEY_RIGHT)) {
-		if (IsKeyPressed(KEY_LEFT_SHIFT) || IsKeyPressed(KEY_RIGHT_SHIFT)) {
-			if (i_select_texture_index(&s, -1, light_reset))
-				return 1;
-		} else {
-			if (i_select_texture_index(&s, 1, light_reset))
-				return 1;
-		}
-	} else if (IsKeyPressed(KEY_P) || IsKeyPressed(KEY_LEFT)) {
-		if (IsKeyPressed(KEY_LEFT_SHIFT) || IsKeyPressed(KEY_RIGHT_SHIFT)) {
-			if (i_select_texture_index(&s, 1, light_reset))
-				return 1;
-		} else {
-			if (i_select_texture_index(&s, -1, light_reset))
-				return 1;
-		}
-	} else if (IsKeyPressed(KEY_PAGE_UP)) {
-		if (i_select_texture_index(&s, -5, light_reset))
-			return 1;
-	} else if (IsKeyPressed(KEY_PAGE_DOWN)) {
-		if (i_select_texture_index(&s, 5, light_reset))
-			return 1;
-	} else if (IsKeyPressed(KEY_HOME)) {
-		if (i_select_texture_index(&s, -s.selected_input, light_reset))
-			return 1;
-	} else if (IsKeyPressed(KEY_END)) {
-		if (i_select_texture_index(&s, s.n_inputs - s.selected_input - 1, light_reset))
-			return 1;
-	} else {
-		float k = GetMouseWheelMove();
-		if (k == 0)
-			goto skip;
-
+	if (!key && scroll) {
 		/* please don't ask me how this math works */
-		float mx = 1. + s.mod_x * k;
+		float mx = 1. + s.mod_x * scroll;
 		s.scale_x *= mx;
 		float rx = s.mouse_x - mx * (s.mouse_x - s.ofs_x);
 		s.ofs_x = rx;
 
-		float my = 1. + s.mod_y * k;
+		float my = 1. + s.mod_y * scroll;
 		s.scale_y *= my;
 		float ry = s.mouse_y - my * (s.mouse_y - s.ofs_y);
 		s.ofs_y = ry;
-	} skip:;
+
+	} else if (key == KEY_T) {
+		s.background = (s.background + 1) % _background_type_count;
+
+	} else if (key == KEY_SPACE) {
+		i_select_texture_index(&s, 0, full_reset);
+	} else if (key == KEY_F) {
+		s.filter_on = !s.filter_on;
+		i_select_texture_index(&s, 0, no_reset);
+
+	} else if (key == KEY_N || key == KEY_RIGHT) {
+		i_select_texture_index(&s, mod!=mod_shift?1:-1, light_reset);
+	} else if (key == KEY_P || key == KEY_LEFT) {
+		i_select_texture_index(&s, mod!=mod_shift?-1:1, light_reset);
+	} else if (key == KEY_PAGE_UP) {
+		i_select_texture_index(&s, -5, light_reset);
+	} else if (key == KEY_PAGE_DOWN) {
+		i_select_texture_index(&s, 5, light_reset);
+	} else if (key == KEY_HOME) {
+		i_select_texture_index(&s, -s.selected_input, light_reset);
+	} else if (key == KEY_END) {
+		i_select_texture_index(&s, s.n_inputs - s.selected_input - 1, light_reset);
+	}
 
 	/* Postupdate */
 	s.scale_x = Clamp(s.scale_x, 0.0001, 1000);
@@ -541,6 +566,15 @@ i_state_draw(state_t *const state)
 
 	return 0;
 }
+
+static int
+i_state_check(state_t *const state)
+{
+
+
+	return 0;
+}
+
 int
 state_execute(state_t *const state)
 {
@@ -550,7 +584,10 @@ state_execute(state_t *const state)
 		BRRLOG_NOR("No inputs given, nothing to do");
 		return 0;
 	}
-	if (state->mode == operation_mode_look) {
+
+	if (state->mode == operation_mode_check) {
+		return i_state_check(state);
+	} else {
 		if (i_init_window(state)) {
 			BRRLOG_ERR("Could not initialize graphics context: %s (%i)", strerror(errno), errno);
 			state_clear(state);
@@ -560,15 +597,10 @@ state_execute(state_t *const state)
 			return 1;
 
 		while (state->valid && !WindowShouldClose()) {
-			if (i_state_update(state)) {
-				return 1;
-			}
-			if (i_state_draw(state)) {
-				return 1;
-			}
+			i_state_update(state);
+			i_state_draw(state);
 		}
-	} else {
-		BRRLOG_DEB("TODO execute check operation");
+
+		return 0;
 	}
-	return 0;
 }

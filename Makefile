@@ -22,6 +22,8 @@ vndOut=$(raylibOut) $(brrtoolsOut)
 objDir := $(outDir)/obj
 objOut := $(addprefix $(objDir)/,$(patsubst $(srcDir)/%,%,$(srcIn:.c=.o)))
 
+STRIP := strip -s -M -v -x
+
 _cc_warnings=-Wall -Wextra\
 	-Werror=implicit-function-declaration -Werror=missing-declarations\
 	-Wno-unused-function -Wno-sign-compare -Wno-unused-parameter\
@@ -57,14 +59,13 @@ again: clean all
 AGAIN: CLEAN all
 
 ifndef DEBUG
- cflags+=-O3 -Ofast
+ cflags+=-O3 -Ofast -DNDEBUG
 else
- cflags+=-O0 -g
+ cflags+=-O0 -g -DDDV_DEBUG
  ifndef MEMCHECK
-  cflags+=-pg -no-pie
+  cflags+=-pg -no-pie -DDDV_MEMCHECK
   ldflags+=-pg -no-pie
  endif
-
  raylibArg:=RAYLIB_BUILD_MODE=DEBUG
 endif
 raylibDir := "$(vndDir)"/raylib
@@ -103,12 +104,18 @@ brrtoolsOutDir := "$(outDir)"/"$(brrtoolsDir)"
 brrtoolsInc := "$(brrtoolsOutDir)"/include
 brrtoolsOut := "$(brrtoolsOutDir)"/lib/libbrrtools.a
 
+brrtoolsDebug :=
+ifdef DEBUG
+ brrtoolsDebug += DEBUG=$(DEBUG)
+ ifdef MEMCHECK
+  brrtoolsDebug += MEMCHECK=$(MEMCHECK)
+ endif
+endif
 $(brrtoolsOut): Makefile
 	@cd "$(brrtoolsDir)" && \
 		$(MAKE) install \
 		prefix="$(abspath $(brrtoolsOutDir))" \
-		DEBUG=$(DEBUG) \
-		MEMCHECK=$(MEMCHECK) \
+		$(brrtoolsDebug) \
 		TARGET_MODE=STATIC \
 		DO_LDCONFIG=0
 brrtools: $(brrtoolsOut)
@@ -127,5 +134,8 @@ vnd-clean: brrtools-clean
 
 install: $(prgName)
 	@cp -fv "$(prgName)" "$(prefix)"/bin
+ifndef $(DEBUG)
+	$(STRIP) "$(prefix)"/bin/"$(prgName)"
+endif
 uninstall:
 	@rm -fv "$(prefix)"/bin/"$(prgName)" 2>/dev/null ||:
