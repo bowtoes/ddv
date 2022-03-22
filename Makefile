@@ -3,17 +3,39 @@
 prgName:=ddv
 prefix:=/addtl
 
-srcDir:=src
+srcDir:=./src
+#srcIn:=\
+#	main.c \
+#	state.c \
+#	print.c \
+#	dds/util.c \
+#
+#hdrIn:=\
+#	state.h \
+#	print.h \
+#	dds/util.h \
+
 srcIn:=\
 	main.c \
-	dds.c \
-	state.c \
+	dds/dxt1.c \
+	dds/dxt10.c \
+	dds/dxt2.c \
+	dds/image.c \
+	dds/util.c \
+	dds_loader.c \
 	print.c \
+	state.c \
 
 hdrIn:=\
-	dds.h \
-	state.h \
+	dds/dds.h \
+	dds/dxt1.h \
+	dds/dxt10.h \
+	dds/dxt2.h \
+	dds/image.h \
+	dds/util.h \
+	dds_loader.h \
 	print.h \
+	state.h \
 
 outDir:=_build
 vndDir:=vnd
@@ -24,11 +46,12 @@ objOut := $(addprefix $(objDir)/,$(patsubst $(srcDir)/%,%,$(srcIn:.c=.o)))
 
 STRIP := strip -s -M -v -x
 
-_cc_warnings=-Wall -Wextra\
+_cc_warnings=-Wall -Wextra -pedantic -pedantic-errors -Wpedantic\
 	-Werror=implicit-function-declaration -Werror=missing-declarations\
 	-Wno-unused-function -Wno-sign-compare -Wno-unused-parameter\
-cflags   = -std=c11 -D_XOPEN_SOURCE=500 -D_POSIX_C_SOURCE=200112L -D_GNU_SOURCE $(_cc_warnings) -pedantic -Wall
-includes = $(raylibInc) $(brrtoolsInc)
+
+cflags   = -std=c11 -D_XOPEN_SOURCE=500 -D_POSIX_C_SOURCE=200112L -D_GNU_SOURCE $(_cc_warnings) -pedantic
+includes = $(raylibInc) $(brrtoolsInc) $(srcDir)
 ldflags  = $(vndOut) -lm
 
 all: info setup $(prgName)

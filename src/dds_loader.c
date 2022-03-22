@@ -1,4 +1,4 @@
-#include "dds.h"
+#include "dds_loader.h"
 
 int
 dds_load_to_image(Image *const img, const brrstringr_t *const file)

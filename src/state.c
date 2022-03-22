@@ -2,6 +2,7 @@
 
 #include <errno.h>
 #include <math.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -9,13 +10,15 @@
 #include <raymath.h>
 #include <rlgl.h>
 
-#include <brrtools/brrlog.h>
 #include <brrtools/brrheap.h>
-#include <brrtools/brrstringr.h>
-#include <brrtools/brrpath.h>
+#include <brrtools/brrlog.h>
 #include <brrtools/brrnum.h>
+#include <brrtools/brrpath.h>
+#include <brrtools/brrstringr.h>
 
-#include "dds.h"
+#include "dds/dds.h"
+#include "dds/image.h"
+#include "dds_loader.h"
 #include "print.h"
 
 typedef enum i_supported_imgs {
@@ -48,11 +51,11 @@ static const brrstringr_t i_img_extensions[_i_support_count] = {
 	brrstringr_literal("tga"),
 };
 
-static Texture i_bg_checker = {};
+static Texture i_bg_checker = {0};
 static const Image i_img_checker = {
 	.width = 16, .height = 16, .mipmaps = 1,
 	.format = RL_PIXELFORMAT_UNCOMPRESSED_GRAYSCALE,
-	.data = (char[16*16]){
+	.data = (unsigned char[16*16]){
 		0x99, 0x99, 0x99, 0x99, 0x99, 0x99, 0x99, 0x99, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66,
 		0x99, 0x99, 0x99, 0x99, 0x99, 0x99, 0x99, 0x99, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66,
 		0x99, 0x99, 0x99, 0x99, 0x99, 0x99, 0x99, 0x99, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66,
@@ -178,7 +181,7 @@ i_init_simple(state_t *const state, const char **const inputs, brrsz n_inputs)
 		const char *arg = inputs[i];
 		const brrstringr_t s = brrstringr_cast(arg);
 
-		brrpath_info_t I = {};
+		brrpath_info_t I = {0};
 		if (brrpath_info_get(&I, &s)) {
 			BRRLOG_ERR("Could not get path information for '%s': %s (%i)", arg, strerror(errno), errno);
 			return 1;
@@ -257,7 +260,7 @@ state_init(state_t *const state, int argc, const char **const argv)
 	if (!state)
 		return 0;
 
-	state_t s = {};
+	state_t s = {0};
 	s.mode = operation_mode_check;
 	//s.adjacent_files = 1;
 
@@ -302,7 +305,7 @@ state_init(state_t *const state, int argc, const char **const argv)
 	/* Select the first given file for looking, if it matches */
 	if (s.mode == operation_mode_look && n_unhandled > 0) {
 		brrstringr_t S = brrstringr_cast(unhandled[0]);
-		brrpath_info_t I = {};
+		brrpath_info_t I = {0};
 		if (!brrpath_info_get(&I, &S)) {
 			for (brrsz i = 0; i < s.n_inputs; ++i) {
 				if (s.inputs[i].type == I.type &&
@@ -358,7 +361,7 @@ i_select_texture_index(state_t *const state, int offset, i_texidx_t options)
 {
 	brrsz next = brrnum_wrap(state->selected_input + offset, state->n_inputs, 0);
 	brrpath_info_t P = state->inputs[next];
-	Image I = {};
+	Image I = {0};
 	if (P.components.extension.cstr && 0 == brrstringr_compare(&P.components.extension, &i_img_extensions[i_support_dds], 0)) {
 		if (dds_load_to_image(&I, &P.full_path)) {
 			BRRLOG_ERR("Failed to load DDS image '%s': %s (%i)", P.full_path.cstr, strerror(errno), errno);
@@ -568,10 +571,55 @@ i_state_draw(state_t *const state)
 }
 
 static int
+i_read_file(char **const dst, brrsz *const dst_len, const brrpath_info_t *const file)
+{
+	if (!dst || !dst_len)
+		return 1;
+
+	brrpath_stat_result_t st = file->st;
+	FILE *f = fopen(file->full_path.cstr, "rb");
+	if (!f) {
+		return 1;
+	}
+	char *t = malloc(st.size);
+	if (!t) {
+		fclose(f);
+		return 1;
+	}
+	if (1 != fread(t, st.size, 1, f)) {
+		free(t);
+		fclose(f);
+		return 1;
+	}
+	*dst = t;
+	*dst_len = st.size;
+	fclose(f);
+	return 0;
+}
+static int
 i_state_check(state_t *const state)
 {
+	state_t s = *state;
 
+	for (brrsz i = 0; i < s.n_inputs; ++i) {
+		char *data = NULL;
+		brrsz data_len = 0;
 
+		if (i_read_file(&data, &data_len, &s.inputs[i])) {
+			BRRLOG_ERR("Could not read file '%s': %s (%i)", s.inputs[i].full_path.cstr, strerror(errno), errno);
+			return 1;
+		}
+
+		dds_image_t I = {0};
+		if (dds_image_parse(&I, data, data_len)) {
+			BRRLOG_ERR("Failed to parse DDS data for '%s'", s.inputs[i].full_path.cstr);
+			return 1;
+		}
+		dds_image_log_headers(&I);
+		dds_image_free(&I);
+	}
+
+	*state = s;
 	return 0;
 }
 

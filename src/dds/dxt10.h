@@ -1,11 +1,15 @@
-#ifndef DXT10_H
-#define DXT10_H
+#ifndef DDS_DXT10_H
+#define DDS_DXT10_H
 
-#include "common/pdTypes.h"
-#include "common/pdDebug.h"
-#include "common/pdUtil.h"
+#include <brrtools/brrtypes.h>
 
-typedef enum dxt10DXGIFormatT{
+#include "dds/util.h"
+
+extern const brru4 dxt10_magic;
+extern const fcc_t dxt10_fcc;
+
+// TODO docs
+typedef enum dxt10_dxgi_format {
 	DXGI_FORMAT_UNKNOWN,                    // The format is not known.
 	DXGI_FORMAT_R32G32B32A32_TYPELESS,      // A four-component, 128-bit typeless format that supports 32 bits per channel including alpha.
 	DXGI_FORMAT_R32G32B32A32_FLOAT,         // A four-component, 128-bit floating-point format that supports 32 bits per channel including alpha.
@@ -125,36 +129,50 @@ typedef enum dxt10DXGIFormatT{
 	DXGI_FORMAT_P208,                       // A video format; an 8-bit version of a hybrid planar 4:2:2 format.
 	DXGI_FORMAT_V208,                       // An 8 bit YCbCrA 4:4 rendering format.
 	DXGI_FORMAT_V408,                       // An 8 bit YCbCrA 4:4:4:4 rendering format.
-	DXGI_FORMAT_SAMPLER_FEEDBACK_MIN_MIP_OPAQUE,
-	DXGI_FORMAT_SAMPLER_FEEDBACK_MIP_REGION_USED_OPAQUE,
-	DXGI_FORMAT_FORCE_UINT = 0xFFFFFFFFUL   // Forces this enumeration to compile to 32 bits in size.
-} dxt10FormatT;
-typedef enum dxt10DimensionT {
+	DXGI_FORMAT_SAMPLER_FEEDBACK_MIN_MIP_OPAQUE,         // TODO what is this?
+	DXGI_FORMAT_SAMPLER_FEEDBACK_MIP_REGION_USED_OPAQUE, // TODO what is this?
+	DXGI_FORMAT_COUNT,
+	//DXGI_FORMAT_FORCE_UINT = 0xFFFFFFFFUL   // Forces this enumeration to compile to 32 bits in size.
+} dxt10_dxgi_format_t;
+pr_desc_t
+dxt10_dxgi_format_desc(dxt10_dxgi_format_t format);
+
+// TODO docs
+typedef enum dxt10_dimension {
 	DDS_DIMENSION_TEXTURE_1D = 2, // DDS is a 1D texture, with size stored in width.
 	DDS_DIMENSION_TEXTURE_2D = 3, // DDS is a 2D texture, with width and height stored in width and height respectively.
 	DDS_DIMENSION_TEXTURE_3D = 4, // DDS is a 3D texture, with depth stored in depth.
-} dxt10DimensionT;
-typedef enum dxt10ResourceMiscT {
+} dxt10_dimension_t;
+pr_desc_t
+dxt10_dimension_desc(dxt10_dimension_t dimension);
+
+// TODO docs
+typedef enum dxt10_resource_misc {
 	DDS_RESOURCE_MISC_TEXTURECUBE = 0x4, // Indicates a 2D texture is a cubemap.
-} dxt10ResourceMiscT;
-typedef enum dxt10AlphaModeT {
+} dxt10_resource_misc_t;
+pr_desc_t
+dxt10_resource_misc_desc(dxt10_resource_misc_t resource);
+
+// TODO docs
+typedef enum dxt10_alpha_mode {
 	DDS_ALPHA_MODE_UNKNOWN       = 0x0, // Alpha channel content is unknown.
 	DDS_ALPHA_MODE_STRAIGHT      = 0x1, // Alpha channel content is presumed to be straight.
 	DDS_ALPHA_MODE_PREMULTIPLIED = 0x2, // Alpha channel content is premultiplied.
 	DDS_ALPHA_MODE_OPAQUE        = 0x3, // Alpha channel content is set to fully opaque.
 	DDS_ALPHA_MODE_CUSTOM        = 0x4, // Alpha channel content is not meant to represent transparancy.
-} dxt10AlphaModeT;
-typedef struct ddsHeaderDXT10T {
-	u32 format;     // DXGI pixel format.
-	u32 dimension;  // D3D10 resource dimension.
-	u32 miscflag;   // Less common options for resources.
-	u32 arraysize;  // Number of textures in DDS. Must be 1 for 3D textures.
-	u32 alphaflag;  // Flag specifiying how alpha is represented in DDS.
-} ddsHeaderDXT10T;
-#define DDS_HEADERDXT10_SIZE 20
-PD_STATIC_ASSERT(sizeof(ddsHeaderDXT10T) == DDS_HEADERDXT10_SIZE, "");
+} dxt10_alpha_mode_t;
+pr_desc_t
+dxt10_alpha_mode_desc(dxt10_alpha_mode_t mode);
 
-#define DXT10_MAGIC  MAGIC('D','X','1','0')
-#define DXT10_FOURCC FOURCC('D','X','1','0')
+// TODO docs
+typedef struct dds_header_dxt10 {
+	brru4 format;     // DXGI pixel format.
+	brru4 dimension;  // D3D10 resource dimension.
+	brru4 miscflag;   // Less common options for resources.
+	brru4 arraysize;  // Number of textures in DDS. Must be 1 for 3D textures.
+	brru4 alphaflag;  // Flag specifiying how alpha is represented in DDS.
+} dds_header_dxt10_t;
+// DXT10 header is exactly 20 bytes
+#define DDS_HEADER_DXT10_SIZE 20
 
-#endif /* DXT10_H */
+#endif /* DDS_DXT10_H */

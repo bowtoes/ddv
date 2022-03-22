@@ -1,14 +1,14 @@
-#include <stdio.h>
-
 #include <errno.h>
+#include <stdio.h>
 #include <string.h>
 
-#include <brrtools/brrstringr.h>
+#include <brrtools/brrheap.h>
 #include <brrtools/brrlog.h>
 #include <brrtools/brrpath.h>
-#include <brrtools/brrheap.h>
+#include <brrtools/brrstringr.h>
 
 #include "state.h"
+
 int
 main(int argc, char **argv)
 {
@@ -20,7 +20,7 @@ main(int argc, char **argv)
 	SetTraceLogLevel(LOG_INFO);
 #endif
 
-	state_t state = {};
+	state_t state = {0};
 
 	if (state_init(&state, argc - 1, (const char **)argv + 1)) {
 		return 1;
